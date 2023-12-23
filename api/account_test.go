@@ -19,49 +19,58 @@ import (
 func TestGetAccountAPI(t *testing.T){
 	account:=RandomAccount()
 
-	// testCases:=[]struct{
-	// 	name string 
-	// 	accountID int64
-	// 	buldSubs func(store *mockdb.MockStore)
-	// 	checkResponse func(t *testing.T,recorder *httptest.ResponseRecorder)
-	// }{
-	// 	{
-	// 		name: "OK",
-	// 		accountID:account.ID,
-	// 		buldSubs: func(store *mockdb.MockStore){
+	testCases:=[]struct{
+		name string 
+		accountID int64
+		buldSubs func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T,recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			accountID:account.ID,
+			buldSubs: func(store *mockdb.MockStore){
 
-	// 		},
-	// 		checkResponse: func(t *testing.T,recorder *httptest.ResponseRecorder){
+			},
+			checkResponse: func(t *testing.T,recorder *httptest.ResponseRecorder){
+				require.Equal(t,http.StatusOK,recorder.Code)
+				requiredBodyMatchAccount(t,recorder.Body,account)
+			},
 
-	// 		}
+		},
+		
 
-	// 	}
+	}
 
-	// }
-	ctrl:=gomock.NewController(t)
-	defer ctrl.Finish()
-	store:=mockdb.NewMockStore(ctrl)
+	for i :=range testCases{
+
+		tc:=testCases[i]
+		t.Run(tc.name,func(t *testing.T) {
+			ctrl:=gomock.NewController(t)
+			defer ctrl.Finish()
+			store:=mockdb.NewMockStore(ctrl)
+			tc.buldSubs(store)
+
+			store.EXPECT().
+			GetAccount(gomock.Any(),gomock.Eq(account.ID)).
+			Times(1).
+			Return(account,nil)
 
 
-	store.EXPECT().
-	GetAccount(gomock.Any(),gomock.Eq(account.ID)).
-	Times(1).
-	Return(account,nil)
+			server:=NewServer(store)
 
+			recorder:=httptest.NewRecorder()
 
-	server:=NewServer(store)
+			url:=fmt.Sprintf("/accounts/%d",account.ID)
 
-	recorder:=httptest.NewRecorder()
+			request,err:=http.NewRequest(http.MethodGet,url,nil)
+			require.NoError(t,err)
 
-	url:=fmt.Sprintf("/accounts/%d",account.ID)
+			server.router.ServeHTTP(recorder,request)
+			tc.checkResponse(t,recorder)
+		})
+		
 
-	request,err:=http.NewRequest(http.MethodGet,url,nil)
-	require.NoError(t,err)
-
-	server.router.ServeHTTP(recorder,request)
-
-	require.Equal(t,http.StatusOK,recorder.Code)
-	requiredBodyMatchAccount(t,recorder.Body,account)
+	}
 	
 
 
